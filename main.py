@@ -25,10 +25,32 @@ class LilaBot(commands.Bot):
 
     async def db_fill(self):
         prefixes = await self.pg_con.fetch("SELECT * FROM prefixes")
-        self.cache_prefix = dict(prefixes)
+        self.cache_prefix = {data["snowflake_id"]: set(data["prefixes"]) for data in prefixes}
+
+    def load_cog(self):
+        for cog in self.loading_cog:
+            ext = "cogs." if cog != "jishaku" else ""
+            if error := try_catch(self.load_extension, f"{ext}{cog}"):
+                print("Error while loading:", cog, "\n", error)
+            else:
+                print(cog, "is now loaded")
 
     async def get_prefix(self, message):
-        return "?uwu "
+        query = "INSERT INTO prefixes VALUES ($1, $2) ON CONFLICT (snowflake_id) DO NOTHING"
+        cur_prefix = {self.default_prefix}
+        if message.author.id in self.cache_prefix:
+            cur_prefix = cur_prefix.union(self.cache_prefix[message.author.id])
+        else:
+            await self.pg_con.execute(query, message.author.id, [self.default_prefix])
+            self.cache_prefix.update({message.author.id: {self.default_prefix}})
+
+        if message.guild:
+            if message.guild.id in self.cache_prefix:
+                cur_prefix = cur_prefix.union(self.cache_prefix[message.guild.id])
+            else:
+                await self.pg_con.execute(query, message.guild.id, [self.default_prefix])
+                self.cache_prefix.update({message.guild.id: {self.default_prefix}})
+        return cur_prefix
 
     def starter(self):
         try:
@@ -45,6 +67,8 @@ class LilaBot(commands.Bot):
         else:
             self.uptime = datetime.datetime.utcnow()
             self.pg_con = loop_pg
+            self.loop.run_until_complete(self.db_fill())
+            self.load_cog()
             print("Bot running...   (", self.uptime, ")")
             self.run(self.token)
 
@@ -62,7 +86,8 @@ bot_data = {"intents": intents,
             "user_db": environ.get("USER"),
             "pass_db": environ.get("PASSWORD"),
             "owner_id": 591135329117798400,
-            "attrs": ["color", "token", "tester", "default_prefix", "cache_prefix", "user_db", "pass_db", "db"]
+            "loading_cog": ("admin", "jishaku"),
+            "attrs": ["color", "token", "tester", "default_prefix", "cache_prefix", "user_db", "pass_db", "db", "loading_cog"]
             }
 
 bot = LilaBot(**bot_data)
@@ -72,6 +97,10 @@ bot = LilaBot(**bot_data)
 async def on_connect():
     bot.connected = datetime.datetime.utcnow()
     print("Online: ", bot.connected)
+
+@bot.event
+async def on_message(message):
+    return
 
 
 @bot.event
