@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from utils.errors import InvalidPrefix
+from utils.errors import InvalidPrefix, CurrentlyPlaying
 
 
 class ValidPrefix(commands.Converter):
@@ -22,3 +22,14 @@ class ValidPrefix(commands.Converter):
             process_prefix = "`, `".join(prefix) if isinstance(prefix, set) else prefix
             raise InvalidPrefix(f"`{argument}` does not exist in your prefix list. "
                                 f"Your current prefix list is {process_prefix}")
+
+
+class Player(discord.Member):
+    @classmethod
+    async def convert(cls, ctx, argument):
+        member = await commands.Converter().convert(ctx, argument)
+        if member.id not in ctx.bot.global_player:
+            return member
+        game = ctx.bot.global_player.get_player(member.id)
+        raise CurrentlyPlaying(f"{member} is currently playing {game}", member, game)
+

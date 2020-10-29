@@ -87,7 +87,11 @@ bot_data = {"intents": intents,
             "pass_db": environ.get("PASSWORD"),
             "owner_id": 591135329117798400,
             "loading_cog": ("admin", "jishaku"),
-            "attrs": ["color", "token", "tester", "default_prefix", "cache_prefix", "user_db", "pass_db", "db", "loading_cog"]
+            "error_color": 0xF67280,
+            "positive_color": 0xDCEDC2,
+            "INVITE_REACT": {True: "<:checkmark:753619798021373974>", False: "<:crossmark:753620331851284480>", None: ""},
+            "attrs": ["color", "token", "tester", "default_prefix", "cache_prefix", "user_db", "pass_db", "db", "loading_cog",
+                      "global_player", "INVITE_REACT"]
             }
 
 bot = LilaBot(**bot_data)

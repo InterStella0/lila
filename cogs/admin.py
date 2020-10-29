@@ -3,18 +3,23 @@ import re
 from discord.ext import commands
 from utils.converters import ValidPrefix
 from utils.useful import BaseEmbed
-from discord.ext.commands import BotMissingPermissions
+from discord.ext.commands import BotMissingPermissions, CooldownMapping, BucketType, CommandOnCooldown
 
 
 class Admin(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.global_cooldown = CooldownMapping.from_cooldown(1, 5, BucketType.user)
         self.PREFIX_UPDATE = """UPDATE prefixes 
                                 SET prefixes= {}
                                 WHERE snowflake_id=$1"""
 
     @commands.check
     async def check_perms(self, ctx):
+        bucket = self.global_cooldown.get_bucket(ctx.message)
+        retry_after = bucket.update_rate_limit()
+        if retry_after:
+            raise CommandOnCooldown(bucket, retry_after)
         if ctx.guild.me.guild_permissions.embed_links:
             return True
         raise BotMissingPermissions("embed_links")
