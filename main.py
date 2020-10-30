@@ -14,7 +14,7 @@ load_dotenv(dotenv_path)
 
 class LilaBot(commands.Bot):
     def __init__(self, **kwargs):
-        self.__dict__.update({attr: kwargs[attr] for attr in kwargs})
+        self.__dict__.update(kwargs)
         super().__init__(command_prefix=self.get_prefix, **kwargs)
 
     @property
