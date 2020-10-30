@@ -88,7 +88,7 @@ async def prompt(ctx, message=None, predicate=None, *, timeout=60, error="{} sec
                              embed=BaseEmbed.to_error(title="Timeout",
                                                       description=error.format(timeout)))
     else:
-        return respond if isinstance(respond, discord.Message) else not respond
+        return respond if event_type != "reaction_add" else not respond
 
 
 async def remove_reaction_handler(message):
