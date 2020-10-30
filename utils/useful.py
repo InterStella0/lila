@@ -88,15 +88,16 @@ async def prompt(ctx, message=None, predicate=None, *, timeout=60, error="{} sec
                              embed=BaseEmbed.to_error(title="Timeout",
                                                       description=error.format(timeout)))
     else:
-        return not respond
+        return respond if isinstance(respond, discord.Message) else not respond
 
 
 async def remove_reaction_handler(message):
+    bot_member = message.guild.me
     if message.guild:
-        if message.guild.me.permissions_in(message.channel).manage_messages:
-            await message.clear_reactions()
-            return
-    [await reaction.remove(message.guild.me) for reaction in message.reactions if reaction.me]
+        if bot_member.permissions_in(message.channel).manage_messages:
+            return await atry_catch(message.clear_reactions)
+
+    [await r.remove(bot_member) for r in message.reactions if r.me]
 
 
 class BaseEmbed(discord.Embed):
