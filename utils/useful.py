@@ -54,7 +54,7 @@ class ReactionAction(menus.Menu):
         except IndexError:
             pass
 
-    async def button_response(self, payload):
+    async def button_response(self, *args, **kwargs):
         # should be overwritten for subclasses or pass
         raise NotImplementedError
 
@@ -66,32 +66,29 @@ class MenuPrompt(ReactionAction):
 
     async def button_response(self, payload, **kwargs):
         await self.message.edit(**kwargs)
-        self.response = self.reactions.index(str(payload.emoji))
+        self.response = list(self.reactions).index(str(payload.emoji))
 
     async def finalize(self, timed_out):
         if timed_out:
-            raise asyncio.TimeoutError()
+            self.response = None
 
 
 async def prompt(ctx, message=None, predicate=None, *, timeout=60, error="{} seconds is up",
                  event_type="message", responses=None):
     bot = ctx.bot
     prompting = await ctx.send(**message or responses and responses.pop(message))
-    try:
-
-        if event_type == "message":
-            respond = await bot.wait_for(event_type, check=predicate, timeout=timeout)
-            return respond
-
+    if event_type != "reaction_add":
+        respond = await atry_catch(bot.wait_for, event_type, check=predicate, timeout=timeout)
+    else:
         menu = MenuPrompt(responses, message=prompting)
-        await menu.start(ctx)
-        # 1st element will always be "approve" while 2nd will be "disapprove"
-        return not menu.response
-    except asyncio.TimeoutError:
+        await menu.start(ctx, wait=True)
+        respond = menu.response
+    if respond is None:
         await prompting.edit(content=None,
                              embed=BaseEmbed.to_error(title="Timeout",
                                                       description=error.format(timeout)))
-        event_type == "reaction_add" and await remove_reaction_handler(prompting)
+    else:
+        return not respond
 
 
 async def remove_reaction_handler(message):

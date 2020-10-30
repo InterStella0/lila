@@ -19,8 +19,8 @@ class CasualGames(commands.Cog):
         responses = {ctx.bot.INVITE_REACT[1 - x]: y for x, y in zip(range(2), responses_text)}
         self.bot.global_player.add(ctx, [player2.id], GAME)
         error = f"Looks like {{}} seconds is up! Sorry {ctx.author}, You will have to request for another one"
-        if not await prompt(ctx, message=message, event_type="reaction_add", responses=responses, error=error):
-            return
+        respond = await prompt(ctx, message=message, event_type="reaction_add", responses=responses, error=error)
+        await ctx.send(str(respond))
 
 
 def setup(bot):
