@@ -1,3 +1,4 @@
+from __future__ import annotations
 import discord
 import datetime
 import asyncio
@@ -5,7 +6,7 @@ from typing import Union
 from discord.ext.commands import Context
 from discord.ext import menus
 from functools import partial, wraps
-
+from io import BytesIO
 
 async def atry_catch(func, *args, catch=Exception, ret=False, **kwargs):
     try:
@@ -75,13 +76,13 @@ class MenuPrompt(ReactionAction):
 
 
 async def prompt(ctx, message=None, predicate=None, *, timeout=60, error="{} seconds is up",
-                 event_type="message", responses=None):
+                 event_type="message", responses=None, delete_after=False):
     bot = ctx.bot
     prompting = await ctx.send(**message or responses and responses.pop(message))
     if event_type != "reaction_add":
         respond = await atry_catch(bot.wait_for, event_type, check=predicate, timeout=timeout)
     else:
-        menu = MenuPrompt(responses, message=prompting)
+        menu = MenuPrompt(responses, message=prompting, delete_message_after=delete_after, check_embeds=True)
         await menu.start(ctx, wait=True)
         respond = menu.response
     if respond is None:
@@ -117,17 +118,17 @@ class BaseEmbed(discord.Embed):
         super().__init__(color=color, timestamp=timestamp, **kwargs)
 
     @classmethod
-    def default(cls, ctx: Union[discord.Message, Context], **kwargs):
+    def default(cls, ctx: Union[discord.Message, Context], **kwargs) -> BaseEmbed:
         instance = cls(**kwargs)
         instance.set_footer(text=f"Requested by {ctx.author}", icon_url=ctx.author.avatar_url)
         return instance
 
     @classmethod
-    def to_error(cls, color=discord.Color.red(), **kwargs):
+    def to_error(cls, color=discord.Color.red(), **kwargs) -> BaseEmbed:
         return cls(color=color, **kwargs)
 
     @classmethod
-    def invite(cls, ctx, game, invited=None, status=True, invitation=None, **kwargs):
+    def invite(cls, ctx, game, invited=None, status=True, invitation=None, **kwargs) -> dict:
         color = {True: ctx.bot.positive_color,
                  False: ctx.bot.error_color,
                  None: ctx.bot.color}
@@ -138,5 +139,18 @@ class BaseEmbed(discord.Embed):
                             title=f"{game} Game invitation {ctx.bot.INVITE_REACT[status]}",
                             description=invitation or f"{invited} has {('', 'dis')[not status]}approved the invitation.",
                             color=color[status],
-                                  **kwargs)}
+                                  **kwargs)
+                      }
         return status_app
+
+    @classmethod
+    def board(cls, message, color, bytes_obj, file_name, **kwargs) -> dict:
+        bytes_obj.seek(0)
+        file = discord.File(bytes_obj, filename=f"{file_name}.png")
+        embed = cls(color=color, timestamp=datetime.datetime.utcnow(), **kwargs)
+        embed.set_image(url=f"attachment://{file.filename}")
+        content = {"content": message,
+                   "embed": embed,
+                   "file": file
+                   }
+        return content
