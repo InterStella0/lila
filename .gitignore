@@ -4,5 +4,6 @@
 .idea
 venv
 *.env
+*.psd
 __pycache__
 nppBackup
