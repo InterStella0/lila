@@ -13,11 +13,9 @@ load_dotenv(dotenv_path)
 
 
 class LilaBot(commands.Bot):
-    def __init__(self, attrs, **kwargs):
+    def __init__(self, **kwargs):
         super().__init__(command_prefix=self.get_prefix, **kwargs)
-        self.__dict__.update({attr: kwargs[attr] if attr in kwargs else None for attr in attrs})
-        self.uptime = None
-        self.pg_con = None
+        self.__dict__.update({attr: kwargs[attr] if attr in kwargs else None for attr in kwargs})
 
     @property
     def stella(self):
@@ -90,10 +88,9 @@ bot_data = {"intents": intents,
             "error_color": 0xF67280,
             "positive_color": 0xDCEDC2,
             "INVITE_REACT": {True: "<:checkmark:753619798021373974>", False: "<:crossmark:753620331851284480>", None: ""},
-            "attrs": ["color", "token", "tester", "default_prefix", "cache_prefix", "user_db", "pass_db", "db", "loading_cog",
-                      "global_player", "INVITE_REACT"]
             }
-
+list_Nones = ["cache_prefix", "global_player", "uptime", "pg_con"]
+bot_data.update(dict.fromkeys(list_Nones))
 bot = LilaBot(**bot_data)
 
 
