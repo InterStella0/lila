@@ -95,7 +95,7 @@ class Game:
 
 class Connect4(Game):
     __slots__ = ("turn", "cols", "rows", "win", "NONE", "board", "new", "FOLDER", "CHANGE",
-                 "previous_image", "first_time", "colors", "WIN_MESSAGE", "DRAW_MESSAGE", "GAME_TIME")
+                 "previous_image", "first_time", "colors", "WIN_MESSAGE", "DRAW_MESSAGE", "GAME_TIME", "moves")
 
     def __init__(self, ctx, second_id, cols=7, rows=6, win_requirements=4):
         super().__init__(ctx, second_id, False)
@@ -114,6 +114,7 @@ class Connect4(Game):
         self.WIN_MESSAGE = "`{0}` wins Connect 4 against `{1}`!"
         self.DRAW_MESSAGE = "Looks like all the columns are full. The game ends with a draw!"
         self.GAME_TIME = "Game lasted `{}`"
+        self.moves = {}
 
     def check_draw(self):
         return all(col[0] != self.NONE for col in self.board)
@@ -130,6 +131,7 @@ class Connect4(Game):
         row = len(col) - (row + 1)
         col[row] = color
         self.new = (column, row)
+        self.moves.update({datetime.datetime.utcnow(): (self.current_player, column)})
         if self.check_draw():
             return self.draw_message()
         if self.check_for_win():
@@ -302,3 +304,4 @@ def render_stroke_image(player_dot_ind, color=(0, 99, 178)):
     stroke_image = Image.fromarray(combined_array)
     stroke_image.thumbnail((old_size[0] + 6, old_size[1] + 6), resample=Image.ANTIALIAS)
     return stroke_image
+

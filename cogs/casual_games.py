@@ -4,6 +4,7 @@ import datetime
 from discord.ext import commands
 from utils.useful import prompt, BaseEmbed
 from utils.converters import Player
+from utils.errors import CurrentlyPlaying
 from utils import game_classes
 from discord.utils import maybe_coroutine
 from typing import Union
@@ -13,6 +14,16 @@ class CasualGames(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.INVITATION = "{0.mention}, {1.author} has invited you to play {2}"
+
+    async def cog_check(self, ctx):
+        # lock the user from making another game while in game or while requesting a game
+        if game := ctx.bot.global_player.get_player(ctx.author.id):
+            argument = f"You are currently waiting for a request of {game} game. You cannot request another game until this ends.", ctx.author, game
+            if game.status:
+                argument = f"You are currently playing {game}. You cannot request another game until this ends.", ctx.author, game
+
+            raise CurrentlyPlaying(*argument)
+        return True
 
     @commands.command()
     @commands.guild_only()
