@@ -14,8 +14,8 @@ load_dotenv(dotenv_path)
 
 class LilaBot(commands.Bot):
     def __init__(self, **kwargs):
+        self.__dict__.update({attr: kwargs[attr] for attr in kwargs})
         super().__init__(command_prefix=self.get_prefix, **kwargs)
-        self.__dict__.update({attr: kwargs[attr] if attr in kwargs else None for attr in kwargs})
 
     @property
     def stella(self):
@@ -101,6 +101,7 @@ async def on_connect():
 
 @bot.event
 async def on_message(message):
+    # on_message event is handled in admin cog
     return
 
 
