@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 from utils.useful import prompt, BaseEmbed
 from utils.converters import Player
+from utils import game_classes
 from typing import Union
 
 
@@ -17,7 +18,7 @@ class CasualGames(commands.Cog):
         message["content"] = player2.mention
         responses_text = tuple(BaseEmbed.invite(ctx, GAME, status=not x, invited=player2) for x in range(2))  # first is approve, second disapprove
         responses = {ctx.bot.INVITE_REACT[1 - x]: y for x, y in zip(range(2), responses_text)}
-        game = self.bot.global_player.add(ctx, [player2.id], GAME)
+        game = self.bot.global_player.add(ctx, [player2.id], game_classes.Connect4)
         error = f"Looks like {{}} seconds is up! Sorry {ctx.author}, You will have to request for another one"
         respond = await prompt(ctx, message=message, event_type="reaction_add", responses=responses, error=error)
         if not respond:
@@ -25,6 +26,26 @@ class CasualGames(commands.Cog):
             return
         game.status = True
 
+        def check_turn(game):
+            def predicate(m):
+                checking = (m.author == game.current_player,
+                            m.content.isdigit() and 1 <= int(m.content.isdigit()) <= game.cols
+                            )
+
+                return all(checking)
+            return predicate
+
+        async def connect4_prompt(game):
+            display = await game.render_board()
+            player = game.current_player
+            description = f"{player}, It's your turn. Please choose a column between 1 to 7."
+            message = BaseEmbed.board(player.mention, game.color, display, "connect_4",
+                                      title="Connect 4", description=description)
+            error = f"{{}} seconds is up. Looks like {game.last_player} wins"
+            return await prompt(ctx, message=message, predicate=check_turn(game), error=error, delete_after=True)
+
+        while response := await connect4_prompt(game):
+            game.insert(int(response.content) - 1)
 
 
 
