@@ -113,7 +113,7 @@ class Connect4(Game):
         self.colors = (0x000001, 0xfffffe)
         self.WIN_MESSAGE = "`{0}` wins Connect 4 against `{1}`!"
         self.DRAW_MESSAGE = "Looks like all the columns are full. The game ends with a draw!"
-        self.GAME_TIME = "Game lasted `{}`"
+        self.GAME_TIME = "Game lasted {}"
         self.moves = {}
 
     def check_draw(self):
@@ -125,7 +125,7 @@ class Connect4(Game):
         col = self.board[column]
         final_cell = 0
         if col[final_cell] != self.NONE:
-            raise Connect4ColumnFull(self.players[color], column)
+            raise Connect4ColumnFull(self.players[color - 1], column + 1)
 
         row = col[::-1].index(self.NONE)
         row = len(col) - (row + 1)
