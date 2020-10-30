@@ -3,6 +3,7 @@ import datetime
 import asyncio
 from typing import Union
 from discord.ext.commands import Context
+from discord.ext import menus
 
 
 async def atry_catch(func, *args, catch=Exception, ret=False, **kwargs):
@@ -19,24 +20,73 @@ def try_catch(func, *args, catch=Exception, ret=False, **kwargs):
         return e if ret else None
 
 
-async def prompt(ctx, message, predicate, *, timeout=60, app=None, disapp=None, error="{} seconds is up",
-                 event_type="message", reactions=()):
+class ReactionAction(menus.Menu):
+    def __init__(self, reactions, *, timeout=60.0,  **kwargs):
+        super().__init__(timeout=timeout, **kwargs)
+        self.reactions = reactions
+        self.create_buttons(reactions)
+
+    @property
+    def reactions(self):
+        return self._reactions
+
+    @reactions.setter
+    def reactions(self, value):
+        try:
+            iter(value)
+        except TypeError:
+            raise TypeError('invalid type for reactions: expected iterable, got {}'.format(type(value)))
+        if not len(value) or len(value) > 20:
+            raise ValueError(f'len(reactions) must be 0 < x <= 20: got {len(value)}')
+        self._reactions = value
+
+    def create_buttons(self, reactions):
+        # override if you want button to do something different
+        try:
+            for index, emoji in enumerate(reactions):
+                # each button calls `self.button_response(payload)` so you can do based on that
+                def callback(items):
+                    async def inside(self, payload):
+                        await self.button_response(payload, **items)
+                        self.stop()
+                    return inside
+                self.add_button(menus.Button(emoji, callback(reactions[emoji]), position=menus.Position(index)))
+        except IndexError:
+            pass
+
+    async def button_response(self, payload):
+        # should be overwritten for subclasses or pass
+        raise NotImplementedError
+
+
+class MenuPrompt(ReactionAction):
+    def __init__(self, reactions, **kwargs):
+        super().__init__(reactions, **kwargs)
+        self.response = None
+
+    async def button_response(self, payload, **kwargs):
+        await self.message.edit(**kwargs)
+        self.response = self.reactions.index(str(payload.emoji))
+
+    async def finalize(self, timed_out):
+        if timed_out:
+            raise asyncio.TimeoutError()
+
+
+async def prompt(ctx, message=None, predicate=None, *, timeout=60, error="{} seconds is up",
+                 event_type="message", responses=None):
     bot = ctx.bot
-    prompting = await ctx.send(**message)
-    if event_type == "reaction_add":
-        reactions = tuple(ctx.bot.INVITE_REACT[x] for x in range(2))
-        for reaction in reactions:
-            await prompting.add_reaction(reaction)
+    prompting = await ctx.send(**message or responses and responses.pop(message))
     try:
-        respond = await bot.wait_for(event_type, check=predicate, timeout=timeout)
+
         if event_type == "message":
+            respond = await bot.wait_for(event_type, check=predicate, timeout=timeout)
             return respond
 
-        reaction, user = respond
+        menu = MenuPrompt(responses, message=prompting)
+        await menu.start(ctx)
         # 1st element will always be "approve" while 2nd will be "disapprove"
-        result = reactions.index(str(reaction))
-        await prompting.edit(**(app, disapp)[result])
-        return not result
+        return not menu.response
     except asyncio.TimeoutError:
         await prompting.edit(content=None,
                              embed=BaseEmbed.to_error(title="Timeout",
@@ -76,7 +126,7 @@ class BaseEmbed(discord.Embed):
                           cls.default(
                             ctx,
                             title=f"{game} Game invitation {ctx.bot.INVITE_REACT[status]}",
-                            description=invitation or f"{invited} has {('', 'dis')[status]}approved the invitation.",
+                            description=invitation or f"{invited} has {('', 'dis')[not status]}approved the invitation.",
                             color=color[status],
                                   **kwargs)}
         return status_app

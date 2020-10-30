@@ -24,8 +24,7 @@ class ValidPrefix(commands.Converter):
                                 f"Your current prefix list is {process_prefix}")
 
 
-# I subclass discord.Member just to make the linter stfu
-class Player(commands.MemberConverter, discord.Member):
+class Player(commands.MemberConverter):
     async def convert(self, ctx, argument):
         member = await super().convert(ctx, argument)
         if game := ctx.bot.global_player.get_player(member.id):
