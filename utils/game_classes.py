@@ -1,8 +1,12 @@
+from __future__ import annotations
 import datetime
 from utils.errors import AnotherGame
+from typing import Union
 
 
 class GlobalPlayers:
+    __slots__ = ("games",)
+
     def __init__(self):
         # Author will have the Game object
         # While the player will point to the author's id
@@ -18,16 +22,33 @@ class GlobalPlayers:
 
     def add(self, ctx, players_id, game):
         if ctx.author.id in self.games:
-            raise AnotherGame(ctx.author.id) # if coded correctly, this isn't possible to hit
+            raise AnotherGame(ctx.author.id)  # if coded correctly, this isn't possible to hit
         new_game = Game(ctx, players_id, game, False)
         self.games.update({ctx.author.id: new_game})
         for player_id in players_id:
             if player_id in self.games:
                 raise AnotherGame(player_id)
             self.games.update({player_id: ctx.author.id})
+        return new_game
+
+    def remove(self, game: Union[Game, int]):
+        if isinstance(game, int):
+            # if int, it must be an author id
+            game = self.games.pop(game)
+            for player_id in game.players_id:
+                self.games.pop(player_id, None)
+        else:
+            self.games.pop(game.author_id)
+            for player_id in game.players_id:
+                self.games.pop(player_id, None)
+
+    def __len__(self):
+        return len(self.games)
 
 
 class Game:
+    __slots__ = ("ctx", "created_at", "author_id", "players_id", "game", "status")
+
     def __init__(self, ctx, players_id: list, game: str, status: bool):
         self.ctx = ctx
         self.created_at = datetime.datetime.utcnow()

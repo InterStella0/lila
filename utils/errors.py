@@ -14,6 +14,7 @@ class CurrentlyPlaying(CheckFailure):
         self.user_playing = user_playing
         self.game = game
 
+
 class AnotherGame(CheckFailure):
     def __init__(self, author_id):
         super().__init__(message="{} is already playing. This isn't possible.".format(author_id))
