@@ -1,5 +1,6 @@
 from __future__ import annotations
 import asyncio
+import discord
 import random
 import datetime
 from itertools import chain, groupby
@@ -9,7 +10,9 @@ from utils.useful import make_async
 from typing import Union
 from PIL import Image, ImageDraw, ImageFont
 from utils.errors import Connect4ColumnFull
+from utils.useful import BaseEmbed
 from io import BytesIO
+from humanize import precisedelta
 from collections import namedtuple
 
 
@@ -56,11 +59,12 @@ class GlobalPlayers:
 
 
 class Game:
-    __slots__ = ("ctx", "created_at", "author_id", "players_id", "status", "_players", "ROOT")
+    __slots__ = ("ctx", "created_at", "author_id", "players_id", "status", "_players", "ROOT", "ended_at")
 
     def __init__(self, ctx, players_id: list, status: bool):
         self.ctx = ctx
         self.created_at = datetime.datetime.utcnow()
+        self.ended_at = None
         self.author_id = ctx.author.id
         self.players_id = players_id
         self.status = status
@@ -91,7 +95,7 @@ class Game:
 
 class Connect4(Game):
     __slots__ = ("turn", "cols", "rows", "win", "NONE", "board", "new", "FOLDER", "CHANGE",
-                 "previous_image", "first_time", "CLASSFULL", "colors")
+                 "previous_image", "first_time", "colors", "WIN_MESSAGE", "DRAW_MESSAGE", "GAME_TIME")
 
     def __init__(self, ctx, second_id, cols=7, rows=6, win_requirements=4):
         super().__init__(ctx, second_id, False)
@@ -107,6 +111,9 @@ class Connect4(Game):
         self.previous_image = None
         self.first_time = True
         self.colors = (0x000001, 0xfffffe)
+        self.WIN_MESSAGE = "`{0}` wins Connect 4 against `{1}`!"
+        self.DRAW_MESSAGE = "Looks like all the columns are full. The game ends with a draw!"
+        self.GAME_TIME = "Game lasted `{}`"
 
     def check_draw(self):
         return all(col[0] != self.NONE for col in self.board)
@@ -119,15 +126,34 @@ class Connect4(Game):
         if col[final_cell] != self.NONE:
             raise Connect4ColumnFull(self.players[color], column)
 
-        row = col.index(self.NONE)
-        col[row] = color
+        row = col[::-1].index(self.NONE)
         row = len(col) - (row + 1)
+        col[row] = color
         self.new = (column, row)
         if self.check_draw():
-            return "draw"
+            return self.draw_message()
         if self.check_for_win():
-            return "win"
+            return self.win_message()
         self.change_turn()
+
+    def draw_message(self):
+        return self.end_message(self.DRAW_MESSAGE)
+
+    def win_message(self):
+        message = self.WIN_MESSAGE.format(self.current_player, self.last_player)
+        kwargs = {"color": self.color}
+        return self.end_message(message, **kwargs)
+
+    async def end_message(self, message, **kwargs):
+        self.ended_at = datetime.datetime.utcnow()
+        display = await self.render_board()
+        file = discord.File(display, filename="connect_4.png")
+        embed = BaseEmbed(timestamp=self.ended_at, **kwargs)
+        embed.title = self.game
+        embed.description = message
+        embed.set_image(url=f"attachment://{file.filename}")
+        embed.set_footer(text=self.GAME_TIME.format(precisedelta(self.ended_at - self.created_at)))
+        return {"embed": embed, "file": file}
 
     def check_for_win(self):
         """Check the current board for a winner."""
@@ -161,31 +187,31 @@ class Connect4(Game):
 
     async def render_board(self):
         """Renders the board, putting everything in place including text, players and the board itself"""
-        image_board = self.previous_image
         if self.first_time:
             image_board = await self.first_time_render()
-            self.previous_image = image_board
-            return await to_bytes(image_board)
-        # Actually draws the player's positions
-        player_dot = tuple(f"player_{x + 1}.png" for x in range(2))
-        FIRST_POSITION = 120
-        INITIAL_X = 92
-        INITIAL_Y = 236
-        MARGIN = 3
-        offset_x, offset_y = tuple(FIRST_POSITION * x for x in self.new)
-        x, y = self.new
-        pos = self.board[x][y] - 1
-        player_resources = player_dot[pos]
-        with Image.open(f"{self.FOLDER}/{player_resources}") as image:
-            stroke_image = await render_stroke_image(image)
-            image_board.paste(stroke_image, ((INITIAL_X + offset_x) - MARGIN, (INITIAL_Y + offset_y) - MARGIN),
-                              mask=stroke_image)
-            image_board.paste(image, (INITIAL_X + offset_x, INITIAL_Y + offset_y),
-                              mask=image)
+            self.previous_image = await to_bytes(image_board)
+            return self.previous_image
+        image_board = self.previous_image
+        with Image.open(image_board) as image_board:
+            # Actually draws the player's positions
+            player_dot = tuple(f"player_{x + 1}.png" for x in range(2))
+            FIRST_POSITION = 120
+            INITIAL_X = 92
+            INITIAL_Y = 236
+            MARGIN = 3
+            offset_x, offset_y = tuple(FIRST_POSITION * x for x in self.new)
+            x, y = self.new
+            pos = self.board[x][y] - 1
+            player_resources = player_dot[pos]
+            with Image.open(f"{self.FOLDER}/{player_resources}") as image:
+                stroke_image = await render_stroke_image(image)
+                image_board.paste(stroke_image, ((INITIAL_X + offset_x) - MARGIN, (INITIAL_Y + offset_y) - MARGIN),
+                                  mask=stroke_image)
+                image_board.paste(image, (INITIAL_X + offset_x, INITIAL_Y + offset_y),
+                                  mask=image)
 
-        self.previous_image = image_board
-
-        return await to_bytes(image_board)
+            self.previous_image = await to_bytes(image_board)
+        return self.previous_image
 
     def diagonals_positive(self, matrix, cols, rows):
         """Get positive diagonals, going from bottom-left to top-right."""
@@ -221,7 +247,10 @@ class Connect4(Game):
 def to_bytes(image):
     buffer = BytesIO()
     image.save(buffer, format="PNG")
+    image.close()
+    buffer.seek(0)
     return buffer
+
 
 @make_async()
 def render_text(text, w_h, textsize, color):

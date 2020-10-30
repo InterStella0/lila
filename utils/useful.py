@@ -76,19 +76,26 @@ class MenuPrompt(ReactionAction):
 
 
 async def prompt(ctx, message=None, predicate=None, *, timeout=60, error="{} seconds is up",
-                 event_type="message", responses=None, delete_after=False):
+                 event_type="message", responses=None, delete_after=False, ret=False, delete_timeout=False):
     bot = ctx.bot
     prompting = await ctx.send(**message or responses and responses.pop(message))
     if event_type != "reaction_add":
-        respond = await atry_catch(bot.wait_for, event_type, check=predicate, timeout=timeout)
+        respond = await atry_catch(bot.wait_for, event_type, check=predicate, timeout=timeout, ret=ret)
     else:
         menu = MenuPrompt(responses, message=prompting, delete_message_after=delete_after, check_embeds=True)
         await menu.start(ctx, wait=True)
         respond = menu.response
-    if respond is None:
-        await prompting.edit(content=None,
-                             embed=BaseEmbed.to_error(title="Timeout",
-                                                      description=error.format(timeout)))
+    if respond is None or isinstance(respond, asyncio.TimeoutError):
+        content = {"content": None,
+                   "embed": BaseEmbed.to_error(title="Timeout",
+                                               description=error.format(timeout))}
+        if not delete_timeout:
+            await prompting.edit(**content)
+        else:
+            await prompting.delete()
+            await ctx.send(**content)
+        if ret:
+            return respond
     else:
         return respond if event_type != "reaction_add" else not respond
 

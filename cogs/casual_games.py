@@ -1,8 +1,11 @@
 import discord
+import asyncio
+import datetime
 from discord.ext import commands
 from utils.useful import prompt, BaseEmbed
 from utils.converters import Player
 from utils import game_classes
+from discord.utils import maybe_coroutine
 from typing import Union
 
 
@@ -12,6 +15,7 @@ class CasualGames(commands.Cog):
         self.INVITATION = "{0.mention}, {1.author} has invited you to play {2}"
 
     @commands.command()
+    @commands.guild_only()
     async def connect4(self, ctx, player2: Player):
         GAME = "Connect 4"
         message = BaseEmbed.invite(ctx, GAME, status=None, invitation=self.INVITATION.format(player2, ctx, GAME))
@@ -28,7 +32,7 @@ class CasualGames(commands.Cog):
 
         def check_turn(game):
             def predicate(m):
-                checking = (m.author == game.current_player,
+                checking = (m.author in (game.current_player, self.bot.stella),
                             m.content.isdigit() and 1 <= int(m.content.isdigit()) <= game.cols
                             )
 
@@ -42,12 +46,17 @@ class CasualGames(commands.Cog):
             message = BaseEmbed.board(player.mention, game.color, display, "connect_4",
                                       title="Connect 4", description=description)
             error = f"{{}} seconds is up. Looks like {game.last_player} wins"
-            return await prompt(ctx, message=message, predicate=check_turn(game), error=error, delete_after=True)
+            return await prompt(ctx, message=message, predicate=check_turn(game), error=error, delete_after=True, ret=True)
 
         while response := await connect4_prompt(game):
-            game.insert(int(response.content) - 1)
-
-
+            if isinstance(response, discord.Message):
+                if game_result := await maybe_coroutine(game.insert, int(response.content) - 1):
+                    await ctx.send(**game_result)
+                    break
+            elif isinstance(response, asyncio.TimeoutError):
+                game.ended_at = datetime.datetime.utcnow()
+                break
+        self.bot.global_player.remove(game)
 
 
 def setup(bot):
