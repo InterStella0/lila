@@ -7,6 +7,7 @@ from os.path import join, dirname
 from dotenv import load_dotenv
 from os import environ
 from utils.useful import try_catch
+from utils.game_classes import GlobalPlayers
 
 dotenv_path = join(dirname(__file__), "bot_settings.env")
 load_dotenv(dotenv_path)
@@ -84,12 +85,13 @@ bot_data = {"intents": intents,
             "user_db": environ.get("USER"),
             "pass_db": environ.get("PASSWORD"),
             "owner_id": 591135329117798400,
-            "loading_cog": ("admin", "jishaku"),
+            "loading_cog": ("admin", "jishaku", "casual_games"),
             "error_color": 0xF67280,
             "positive_color": 0xDCEDC2,
             "INVITE_REACT": {True: "<:checkmark:753619798021373974>", False: "<:crossmark:753620331851284480>", None: ""},
+            "global_player": GlobalPlayers()
             }
-list_Nones = ["cache_prefix", "global_player", "uptime", "pg_con"]
+list_Nones = ["cache_prefix", "uptime", "pg_con"]
 bot_data.update(dict.fromkeys(list_Nones))
 bot = LilaBot(**bot_data)
 

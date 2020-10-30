@@ -24,12 +24,11 @@ class ValidPrefix(commands.Converter):
                                 f"Your current prefix list is {process_prefix}")
 
 
-class Player(discord.Member):
-    @classmethod
-    async def convert(cls, ctx, argument):
-        member = await commands.Converter().convert(ctx, argument)
-        if member.id not in ctx.bot.global_player:
-            return member
-        game = ctx.bot.global_player.get_player(member.id)
-        raise CurrentlyPlaying(f"{member} is currently playing {game}", member, game)
+# I subclass discord.Member just to make the linter stfu
+class Player(commands.MemberConverter, discord.Member):
+    async def convert(self, ctx, argument):
+        member = await super().convert(ctx, argument)
+        if game := ctx.bot.global_player.get_player(member.id):
+            raise CurrentlyPlaying(f"{member} is currently playing {game}", member, game)
+        return member
 
