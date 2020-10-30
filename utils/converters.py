@@ -24,10 +24,20 @@ class ValidPrefix(commands.Converter):
                                 f"Your current prefix list is {process_prefix}")
 
 
-class Player(commands.MemberConverter):
-    async def convert(self, ctx, argument):
-        member = await super().convert(ctx, argument)
+class FakeMember(discord.Member):
+    def __init__(self):
+        pass
+
+
+class Player(commands.MemberConverter, FakeMember):
+    @classmethod
+    async def convert(cls, ctx, argument):
+        member = await commands.MemberConverter().convert(ctx, argument)
         if game := ctx.bot.global_player.get_player(member.id):
-            raise CurrentlyPlaying(f"{member} is currently playing {game}", member, game)
+            argument = f"{member} is currently waiting for a request of {game} game.", member, game
+            if game.status:
+                argument = f"{member} is currently playing {game}", member, game
+
+            raise CurrentlyPlaying(*argument)
         return member
 

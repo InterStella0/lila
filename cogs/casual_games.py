@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 from utils.useful import prompt, BaseEmbed
 from utils.converters import Player
+from typing import Union
 
 
 class CasualGames(commands.Cog):
@@ -12,15 +13,20 @@ class CasualGames(commands.Cog):
     @commands.command()
     async def connect4(self, ctx, player2: Player):
         GAME = "Connect 4"
-
         message = BaseEmbed.invite(ctx, GAME, status=None, invitation=self.INVITATION.format(player2, ctx, GAME))
         message["content"] = player2.mention
         responses_text = tuple(BaseEmbed.invite(ctx, GAME, status=not x, invited=player2) for x in range(2))  # first is approve, second disapprove
         responses = {ctx.bot.INVITE_REACT[1 - x]: y for x, y in zip(range(2), responses_text)}
-        self.bot.global_player.add(ctx, [player2.id], GAME)
+        game = self.bot.global_player.add(ctx, [player2.id], GAME)
         error = f"Looks like {{}} seconds is up! Sorry {ctx.author}, You will have to request for another one"
         respond = await prompt(ctx, message=message, event_type="reaction_add", responses=responses, error=error)
-        await ctx.send(str(respond))
+        if not respond:
+            self.bot.global_player.remove(game)
+            return
+        game.status = True
+
+
+
 
 
 def setup(bot):
