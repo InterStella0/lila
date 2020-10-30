@@ -4,6 +4,7 @@ import asyncio
 from typing import Union
 from discord.ext.commands import Context
 from discord.ext import menus
+from functools import partial, wraps
 
 
 async def atry_catch(func, *args, catch=Exception, ret=False, **kwargs):
@@ -98,6 +99,17 @@ async def remove_reaction_handler(message):
             return await atry_catch(message.clear_reactions)
 
     [await r.remove(bot_member) for r in message.reactions if r.me]
+
+
+def make_async(executor=None):
+    def wrapped(func):
+        @wraps(func)
+        def function(*args, **kwargs):
+            thing = partial(func, *args, **kwargs)
+            loop = asyncio.get_event_loop()
+            return loop.run_in_executor(executor, thing)
+        return function
+    return wrapped
 
 
 class BaseEmbed(discord.Embed):
