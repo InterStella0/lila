@@ -205,15 +205,17 @@ class Connect4(Game):
             x, y = self.new
             pos = self.board[x][y] - 1
             player_resources = player_dot[pos]
+            X, Y = INITIAL_X + offset_x, INITIAL_Y + offset_y
             with Image.open(f"{self.FOLDER}/{player_resources}") as image:
+                image_copy = image_board.copy()
+                image_copy.paste(image, (X, Y), mask=image)
+                self.previous_image = await to_bytes(image_copy)
                 stroke_image = await render_stroke_image(image)
-                image_board.paste(stroke_image, ((INITIAL_X + offset_x) - MARGIN, (INITIAL_Y + offset_y) - MARGIN),
+                image_board.paste(stroke_image, (X - MARGIN, Y - MARGIN),
                                   mask=stroke_image)
-                image_board.paste(image, (INITIAL_X + offset_x, INITIAL_Y + offset_y),
-                                  mask=image)
+                image_board.paste(image, (X, Y), mask=image)
 
-            self.previous_image = await to_bytes(image_board)
-        return self.previous_image
+        return await to_bytes(image_board)
 
     def diagonals_positive(self, matrix, cols, rows):
         """Get positive diagonals, going from bottom-left to top-right."""

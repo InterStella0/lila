@@ -34,7 +34,7 @@ class CasualGames(commands.Cog):
         responses_text = tuple(BaseEmbed.invite(ctx, GAME, status=not x, invited=player2) for x in range(2))  # first is approve, second disapprove
         responses = {ctx.bot.INVITE_REACT[1 - x]: y for x, y in zip(range(2), responses_text)}
         game = self.bot.global_player.add(ctx, [player2.id], game_classes.Connect4)
-        error = f"Looks like {{}} seconds is up! Sorry {ctx.author}, You will have to request for another one"
+        error = f"Looks like {{}} seconds is up! Sorry **{ctx.author}**, You will have to request for another one"
         respond = await prompt(ctx, message=message, event_type="reaction_add", responses=responses, error=error)
         if not respond:
             self.bot.global_player.remove(game)
