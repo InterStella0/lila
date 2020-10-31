@@ -2,11 +2,14 @@ from __future__ import annotations
 import discord
 import datetime
 import asyncio
+import itertools
+import numpy as np
 from typing import Union
 from discord.ext.commands import Context
 from discord.ext import menus
 from functools import partial, wraps
 from io import BytesIO
+
 
 async def atry_catch(func, *args, catch=Exception, ret=False, **kwargs):
     try:
@@ -23,10 +26,18 @@ def try_catch(func, *args, catch=Exception, ret=False, **kwargs):
 
 
 class ReactionAction(menus.Menu):
-    def __init__(self, reactions, *, timeout=60.0,  **kwargs):
+    def __init__(self, reactions, target_id=None, *, timeout=60.0,  **kwargs):
         super().__init__(timeout=timeout, **kwargs)
         self.reactions = reactions
         self.create_buttons(reactions)
+        self.target_id = target_id or set()
+
+    def reaction_check(self, payload):
+        if payload.message_id != self.message.id:
+            return False
+        if payload.user_id not in {self.bot.owner_id, *self.target_id, *self.bot.owner_ids}:
+            return False
+        return payload.emoji in self.buttons
 
     @property
     def reactions(self):
@@ -76,14 +87,15 @@ class MenuPrompt(ReactionAction):
 
 
 async def prompt(ctx, message=None, predicate=None, *, timeout=60, error="{} seconds is up",
-                 event_type="message", responses=None, delete_after=False, ret=False, delete_timeout=False):
+                 event_type="message", responses=None, delete_after=False, ret=False, delete_timeout=False, target_id=None):
     bot = ctx.bot
     prompting = await ctx.send(**message or responses and responses.pop(message))
     if event_type != "reaction_add":
         respond = await atry_catch(bot.wait_for, event_type, check=predicate, timeout=timeout, ret=ret)
     else:
-        menu = MenuPrompt(responses, message=prompting, delete_message_after=delete_after, check_embeds=True)
+        menu = MenuPrompt(responses, message=prompting, delete_message_after=delete_after, check_embeds=True, target_id=target_id)
         await menu.start(ctx, wait=True)
+
         respond = menu.response
     if respond is None or isinstance(respond, asyncio.TimeoutError):
         content = {"content": None,
@@ -161,3 +173,39 @@ class BaseEmbed(discord.Embed):
                    "file": file
                    }
         return content
+
+
+def get_winner(board, cols, rows, win, NONE):
+    """Get the winner on the current board.
+       Win algorithm was made by Patrick Westerhoff, I really like how short he made this.
+    """
+
+    # gives a generator
+    def get_lines(board):
+        lines = (
+            board,  # columns
+            zip(*board),  # rows
+            diagonals_positive(board, cols, rows),  # positive diagonals
+            diagonals_negative(board, cols, rows)  # negative diagonals
+        )
+        return itertools.chain(*lines)
+    real_lines = get_lines(board)
+    # Generates position
+    pos_lines = get_lines(np.arange(1, rows * cols + 1).reshape(cols, rows))
+
+    for line, pos in zip(real_lines, pos_lines):
+        for color, group in itertools.groupby(line):
+            if color != NONE and len(list(group)) >= win:
+                return color, pos
+
+
+def diagonals_positive(matrix, cols, rows):
+    """Get positive diagonals, going from bottom-left to top-right."""
+    for di in ([(j, i - j) for j in range(cols)] for i in range(cols + rows - 1)):
+        yield [matrix[i][j] for i, j in di if 0 <= i < cols and 0 <= j < rows]
+
+
+def diagonals_negative(matrix, cols, rows):
+    """Get negative diagonals, going from top-left to bottom-right."""
+    for di in ([(j, i - cols + j + 1) for j in range(cols)] for i in range(cols + rows - 1)):
+        yield [matrix[i][j] for i, j in di if 0 <= i < cols and 0 <= j < rows]

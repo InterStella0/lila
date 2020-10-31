@@ -3,10 +3,9 @@ import asyncio
 import discord
 import random
 import datetime
-from itertools import chain, groupby
 import numpy as np
 from utils.errors import AnotherGame
-from utils.useful import make_async
+from utils.useful import make_async, get_winner
 from typing import Union
 from PIL import Image, ImageDraw, ImageFont
 from utils.errors import Connect4ColumnFull
@@ -93,9 +92,55 @@ class Game:
         return self.game
 
 
+class TicTacToe(Game):
+    __slots__ = ("turn", "cols", "rows", "win", "NONE", "board", "new", "FOLDER", "CHANGE",
+                 "previous_image", "first_time", "colors", "WIN_MESSAGE", "DRAW_MESSAGE", "GAME_TIME", "moves", "move")
+
+    def __init__(self, ctx, second_id, cols=3, rows=3, win_requirements=3):
+        super().__init__(ctx, second_id, False)
+        self.turn = random.randint(0, len(second_id) + 1)
+        self.cols = cols
+        self.rows = rows
+        self.win = win_requirements
+        self.NONE = -1
+        self.CHANGE = 1
+        self.board = [[self.NONE] * rows for _ in range(cols)]
+        self.new = (-1, -1)
+        self.FOLDER = f"{self.ROOT}/connect_4"
+        self.previous_image = None
+        self.first_time = True
+        self.colors = (0x000001, 0xfffffe)
+        self.WIN_MESSAGE = "`{0}` wins Connect 4 against `{1}`!"
+        self.DRAW_MESSAGE = "Looks like all the columns are full. The game ends with a draw!"
+        self.GAME_TIME = "Game lasted {}"
+        self.moves = {}
+        self.move = 0
+
+    def insert(self, column, row):
+        pass
+
+    def change_turn(self):
+        self.turn ^= self.CHANGE
+        return self.turn
+
+    @property
+    def current_player(self):
+        return self.players[self.turn]
+
+    @property
+    def last_player(self):
+        self.change_turn()
+        last = self.players[self.turn]
+        self.change_turn()
+        return last
+
+    @property
+    def color(self):
+        return self.colors[self.turn]
+
 class Connect4(Game):
     __slots__ = ("turn", "cols", "rows", "win", "NONE", "board", "new", "FOLDER", "CHANGE",
-                 "previous_image", "first_time", "colors", "WIN_MESSAGE", "DRAW_MESSAGE", "GAME_TIME", "moves")
+                 "previous_image", "first_time", "colors", "WIN_MESSAGE", "DRAW_MESSAGE", "GAME_TIME", "moves", "move")
 
     def __init__(self, ctx, second_id, cols=7, rows=6, win_requirements=4):
         super().__init__(ctx, second_id, False)
@@ -110,14 +155,19 @@ class Connect4(Game):
         self.FOLDER = f"{self.ROOT}/connect_4"
         self.previous_image = None
         self.first_time = True
-        self.colors = (0x000001, 0xfffffe)
+        self.colors = (0xfaffde, 0xfb878a)
         self.WIN_MESSAGE = "`{0}` wins Connect 4 against `{1}`!"
         self.DRAW_MESSAGE = "Looks like all the columns are full. The game ends with a draw!"
         self.GAME_TIME = "Game lasted {}"
         self.moves = {}
+        self.move = 0
 
     def check_draw(self):
         return all(col[0] != self.NONE for col in self.board)
+
+    def increment_move(self):
+        self.move += 1
+        return self.move
 
     def insert(self, column):
         """Insert the player color in the given column."""
@@ -131,7 +181,7 @@ class Connect4(Game):
         row = len(col) - (row + 1)
         col[row] = color
         self.new = (column, row)
-        self.moves.update({datetime.datetime.utcnow(): (self.current_player, column)})
+        self.moves.update({self.increment_move(): (self.current_player.id, column)})
         if self.check_draw():
             return self.draw_message()
         if self.check_for_win():
@@ -159,23 +209,7 @@ class Connect4(Game):
 
     def check_for_win(self):
         """Check the current board for a winner."""
-        return self.get_winner()
-
-    def get_winner(self):
-        """Get the winner on the current board.
-           Win algorithm was made by Patrick Westerhoff, I really like how short he made this.
-        """
-        lines = (
-            self.board,  # columns
-            zip(*self.board),  # rows
-            self.diagonals_positive(self.board, self.cols, self.rows),  # positive diagonals
-            self.diagonals_negative(self.board, self.cols, self.rows)  # negative diagonals
-        )
-
-        for line in chain(*lines):
-            for color, group in groupby(line):
-                if color != self.NONE and len(list(group)) >= self.win:
-                    return color
+        return get_winner(self.board, self.cols, self.rows, self.win, self.NONE)
 
     async def first_time_render(self):
         with Image.open(f"{self.FOLDER}/connect4_board.png") as image_board:
@@ -216,16 +250,6 @@ class Connect4(Game):
                 image_board.paste(image, (X, Y), mask=image)
 
         return await to_bytes(image_board)
-
-    def diagonals_positive(self, matrix, cols, rows):
-        """Get positive diagonals, going from bottom-left to top-right."""
-        for di in ([(j, i - j) for j in range(cols)] for i in range(cols + rows - 1)):
-            yield [matrix[i][j] for i, j in di if 0 <= i < cols and 0 <= j < rows]
-
-    def diagonals_negative(self, matrix, cols, rows):
-        """Get negative diagonals, going from top-left to bottom-right."""
-        for di in ([(j, i - cols + j + 1) for j in range(cols)] for i in range(cols + rows - 1)):
-            yield [matrix[i][j] for i, j in di if 0 <= i < cols and 0 <= j < rows]
 
     def change_turn(self):
         self.turn ^= self.CHANGE

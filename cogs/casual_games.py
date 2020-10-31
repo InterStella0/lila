@@ -35,7 +35,8 @@ class CasualGames(commands.Cog):
         responses = {ctx.bot.INVITE_REACT[1 - x]: y for x, y in zip(range(2), responses_text)}
         game = self.bot.global_player.add(ctx, [player2.id], game_classes.Connect4)
         error = f"Looks like {{}} seconds is up! Sorry **{ctx.author}**, You will have to request for another one"
-        respond = await prompt(ctx, message=message, event_type="reaction_add", responses=responses, error=error)
+        respond = await prompt(ctx, message=message, event_type="reaction_add", responses=responses, error=error,
+                               target_id={player2.id})
         if not respond:
             self.bot.global_player.remove(game)
             return
@@ -73,6 +74,7 @@ class CasualGames(commands.Cog):
             elif isinstance(response, asyncio.TimeoutError):
                 game.ended_at = datetime.datetime.utcnow()
                 break
+        print(game.moves)
         self.bot.global_player.remove(game)
 
 
